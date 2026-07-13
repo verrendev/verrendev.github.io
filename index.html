@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>verren.dev</title>
+    <style>
+      :root {
+        --background-color: #121411;
+        --text-color: #a8b5a2;
+        --text-color-muted: #5f6b5b;
+        --accent-green: #7fc47a;
+      }
+
+      * {
+        margin: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        background: var(--background-color);
+        color: var(--text-color);
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 15px;
+        line-height: 1.7;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2.2rem;
+        padding: 2rem 1.5rem 3rem;
+      }
+
+      #fern {
+        width: min(78vw, 52vh, 480px);
+        aspect-ratio: 1;
+        cursor: pointer;
+      }
+
+      main {
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 1.05rem;
+        font-weight: 500;
+        letter-spacing: 0.35em;
+        color: var(--accent-green);
+        text-transform: lowercase;
+      }
+
+      .amane {
+        display: inline-block;
+        margin-top: 1.2rem;
+        color: var(--accent-green);
+        letter-spacing: 0.15em;
+        border-bottom-color: var(--text-color-muted);
+      }
+
+      nav {
+        margin-top: 1.5rem;
+        display: flex;
+        justify-content: center;
+        gap: 1.5rem;
+      }
+
+      a {
+        color: var(--text-color-muted);
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+        transition: color 0.2s, border-color 0.2s;
+      }
+
+      a:hover,
+      a:focus-visible {
+        color: var(--accent-green);
+        border-bottom-color: var(--accent-green);
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="fern" title="replant"></canvas>
+
+    <main>
+      <h1>verren</h1>
+      <a class="amane" href="https://amane.verren.dev">amane →</a>
+      <nav>
+        <a href="https://github.com/verrendev">github</a>
+        <a href="https://youtube.com/@verrendev">youtube</a>
+        <a href="https://x.com/verrendev">x</a>
+      </nav>
+    </main>
+
+    <script>
+      // =============
+      // Barnsley fern
+      // =============
+
+      // https://en.wikipedia.org/wiki/Barnsley_fern
+
+      const canvas = document.getElementById("fern");
+      const context = canvas.getContext("2d");
+
+      const CANVAS_SIZE = 960;
+      canvas.width = CANVAS_SIZE;
+      canvas.height = CANVAS_SIZE;
+
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+
+      // State
+      // -----
+
+      let currentX = 0; // roughly [-2.75, 2.75]
+      let currentY = 0; // roughly [0, 10.6]
+
+      let activeRunId = 0;
+
+      // Color mapping
+      // -------------
+
+      // Darker at the bottom and brighter toward the top.
+      
+      function mossColor(normalizedHeight) {
+        const red = Math.floor(40 + 60 * normalizedHeight);
+        const green = Math.floor(160 + 80 * normalizedHeight);
+        const blue = Math.floor(70 + 40 * normalizedHeight);
+        return `rgb(${red}, ${green}, ${blue})`;
+      }
+
+      // Iteration
+      // ---------
+
+      function applyBarnsleyTransformation() {
+        const randomValue = Math.random();
+        let nextX;
+        let nextY;
+
+        if (randomValue < 0.01) { // stem
+          nextX = 0;
+          nextY = 0.16 * currentY;
+        } else if (randomValue < 0.86) { // successively smaller leaflets
+          nextX = 0.85 * currentX + 0.04 * currentY;
+          nextY = -0.04 * currentX + 0.85 * currentY + 1.6;
+        } else if (randomValue < 0.93) { // largest left-hand leaflet
+          nextX = 0.2 * currentX - 0.26 * currentY;
+          nextY = 0.23 * currentX + 0.22 * currentY + 1.6;
+        } else { // largest right-hand leaflet
+          nextX = -0.15 * currentX + 0.28 * currentY;
+          nextY = 0.26 * currentX + 0.24 * currentY + 0.44;
+        }
+
+        currentX = nextX;
+        currentY = nextY;
+      }
+
+      // Plotting
+      // --------
+
+      const CANVAS_MARGIN = 30;
+      const POINT_SIZE = 1.4;
+      const FERN_WIDTH = 5.5; // roughly [-2.75, 2.75]
+      const FERN_HEIGHT = 10.6; // roughly [0, 10.6]
+      const TOTAL_POINTS = 140000;
+
+      function plotPoints(pointCount) {
+        const drawableSize = CANVAS_SIZE - 2 * CANVAS_MARGIN;
+
+        for (let i = 0; i < pointCount; i++) {
+          applyBarnsleyTransformation();
+
+          const normalizedHeight = currentY / FERN_HEIGHT;
+          const canvasX = ((currentX + FERN_WIDTH / 2) / FERN_WIDTH) * drawableSize + CANVAS_MARGIN;
+          const canvasY = CANVAS_SIZE - CANVAS_MARGIN - normalizedHeight * drawableSize;
+
+          context.fillStyle = mossColor(normalizedHeight);
+          context.fillRect(canvasX, canvasY, POINT_SIZE, POINT_SIZE);
+        }
+      }
+
+      // Growth animation
+      // ----------------
+
+      function growFern() {
+        activeRunId += 1;
+        const runId = activeRunId;
+
+        context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        currentX = 0;
+        currentY = 0;
+
+        // Discard the first few points so the iteration settles onto the fern's attractor before
+        // anything visible is drawn.
+        
+        plotPoints(20);
+
+        if (prefersReducedMotion) {
+          plotPoints(TOTAL_POINTS);
+          return;
+        }
+
+        const POINTS_PER_FRAME = 900;
+        let pointsDrawn = 0;
+
+        function drawNextFrame() {
+          if (runId !== activeRunId) {
+            return;
+          }
+
+          plotPoints(POINTS_PER_FRAME);
+          pointsDrawn += POINTS_PER_FRAME;
+
+          if (pointsDrawn < TOTAL_POINTS) {
+            requestAnimationFrame(drawNextFrame);
+          } else {
+            // Fully grown: keep adding a trickle of points so the fern continues to densify.
+            setInterval(function () {
+              if (runId === activeRunId) {
+                plotPoints(30);
+              }
+            }, 250);
+          }
+        }
+
+        drawNextFrame();
+      }
+
+      canvas.addEventListener("click", growFern);
+      growFern();
+    </script>
+  </body>
+</html>
