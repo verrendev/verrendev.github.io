@@ -95,10 +95,12 @@
 
       nav a,
       nav button {
-        display: block;
+        display: flex;
+        align-items: center;
         padding: 0;
         border: none;
         background: none;
+        font: inherit;
         color: var(--text-color-muted);
         cursor: pointer;
         transition: color 0.2s;
@@ -118,8 +120,40 @@
         shape-rendering: crispEdges;
       }
 
-      nav svg[hidden] {
-        display: none;
+      .discord {
+        display: flex;
+        align-items: center;
+      }
+
+      #discord-reveal {
+        display: flex;
+        align-items: center;
+        max-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        font-size: 0.78rem;
+        letter-spacing: 0.1em;
+        transition: max-width 0.25s ease;
+      }
+
+      .discord.revealed #discord-reveal {
+        max-width: 12em;
+      }
+
+      #discord-handle {
+        padding-left: 0.7em;
+        color: var(--text-color);
+      }
+
+      #discord-copy {
+        margin-left: 0.7em;
+        border-bottom: 1px solid var(--text-color-muted);
+        transition: color 0.2s, border-color 0.2s;
+      }
+
+      #discord-copy:hover,
+      #discord-copy:focus-visible {
+        border-bottom-color: var(--accent-green);
       }
     </style>
   </head>
@@ -134,10 +168,15 @@
         <a href="mailto:hi@verren.dev" title="hi@verren.dev" aria-label="email">
           <svg class="pixel" data-icon="mail" aria-hidden="true"></svg>
         </a>
-        <button id="discord" title="verrendev — click to copy" aria-label="copy discord username">
-          <svg class="pixel" data-icon="discord" id="discord-icon" aria-hidden="true"></svg>
-          <svg class="pixel" data-icon="check" id="discord-copied" aria-hidden="true" hidden></svg>
-        </button>
+        <div class="discord" id="discord">
+          <button id="discord-toggle" title="discord" aria-label="show discord username" aria-expanded="false">
+            <svg class="pixel" data-icon="discord" aria-hidden="true"></svg>
+          </button>
+          <span id="discord-reveal">
+            <span id="discord-handle">verrendev</span>
+            <button id="discord-copy">copy</button>
+          </span>
+        </div>
         <a href="https://github.com/verrendev" title="github" aria-label="github">
           <svg class="pixel" data-icon="github" aria-hidden="true"></svg>
         </a>
@@ -183,18 +222,6 @@
           "###########",
           ".#########.",
           "..#######..",
-        ],
-        check: [
-          "...........",
-          "...........",
-          ".........##",
-          "........##.",
-          ".......##..",
-          "##....##...",
-          ".##..##....",
-          "..####.....",
-          "...##......",
-          "...........",
         ],
       };
 
@@ -471,31 +498,50 @@
       canvas.addEventListener("click", growFern);
       growFern();
 
-      // Discord copy button
-      // ===================
+      // Discord reveal + copy
+      // ---------------------
 
-      const DISCORD_HANDLE = "verrendev";
+      const DISCORD_USERNAME = "verrendev";
 
-      const discordButton = document.getElementById("discord");
-      const discordIcon = document.getElementById("discord-icon");
-      const discordCopiedIcon = document.getElementById("discord-copied");
+      const discordGroup = document.getElementById("discord");
+      const discordToggle = document.getElementById("discord-toggle");
+      const discordCopy = document.getElementById("discord-copy");
       let discordResetTimeout;
 
-      discordButton.addEventListener("click", function () {
+      function setDiscordRevealed(revealed) {
+        discordGroup.classList.toggle("revealed", revealed);
+        discordToggle.setAttribute("aria-expanded", String(revealed));
+      }
+
+      discordToggle.addEventListener("click", function () {
+        setDiscordRevealed(!discordGroup.classList.contains("revealed"));
+      });
+
+      discordCopy.addEventListener("click", function () {
         navigator.clipboard
-          .writeText(DISCORD_HANDLE)
+          .writeText(DISCORD_USERNAME)
           .then(function () {
-            discordIcon.hidden = true;
-            discordCopiedIcon.hidden = false;
+            discordCopy.textContent = "copied";
             clearTimeout(discordResetTimeout);
             discordResetTimeout = setTimeout(function () {
-              discordIcon.hidden = false;
-              discordCopiedIcon.hidden = true;
-            }, 1400);
+              setDiscordRevealed(false);
+              setTimeout(function () {
+                discordCopy.textContent = "copy";
+              }, 250); // restore the label once the collapse transition has hidden it
+            }, 1200);
           })
           .catch(function () {
             console.warn("Clipboard unavailable");
           });
+      });
+
+      // Collapse when clicking anywhere else on the page.
+
+      document.addEventListener("click", function (event) {
+        if (discordGroup.classList.contains("revealed") && !discordGroup.contains(event.target)) {
+          clearTimeout(discordResetTimeout);
+          setDiscordRevealed(false);
+        }
       });
     </script>
   </body>
