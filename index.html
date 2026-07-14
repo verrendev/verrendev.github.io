@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>verren.dev</title>
+    <link id="favicon" rel="icon" type="image/png" />
     <style>
       :root {
         --background-color: #121411;
@@ -50,23 +51,32 @@
         font-size: 1.05rem;
         font-weight: 500;
         letter-spacing: 0.35em;
-        color: var(--accent-green);
+        color: var(--text-color);
         text-transform: lowercase;
       }
 
       .amane {
         display: inline-block;
-        margin-top: 1.2rem;
+        margin-top: 2.6rem;
         color: var(--accent-green);
         letter-spacing: 0.15em;
         border-bottom-color: var(--text-color-muted);
       }
 
+      .tagline {
+        margin-top: 0.5rem;
+        font-size: 0.78rem;
+        letter-spacing: 0.18em;
+        color: var(--text-color-muted);
+        text-transform: lowercase;
+      }
+
       nav {
-        margin-top: 1.5rem;
+        margin-top: 2.8rem;
         display: flex;
         justify-content: center;
-        gap: 1.5rem;
+        align-items: center;
+        gap: 1.8rem;
       }
 
       a {
@@ -82,6 +92,35 @@
         border-bottom-color: var(--accent-green);
         outline: none;
       }
+
+      nav a,
+      nav button {
+        display: block;
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--text-color-muted);
+        cursor: pointer;
+        transition: color 0.2s;
+      }
+
+      nav a:hover,
+      nav a:focus-visible,
+      nav button:hover,
+      nav button:focus-visible {
+        color: var(--accent-green);
+        outline: none;
+      }
+
+      nav svg {
+        display: block;
+        fill: currentColor;
+        shape-rendering: crispEdges;
+      }
+
+      nav svg[hidden] {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -90,14 +129,98 @@
     <main>
       <h1>verren</h1>
       <a class="amane" href="https://amane.verren.dev">amane →</a>
+      <p class="tagline">a fully local ai companion</p>
       <nav>
-        <a href="https://github.com/verrendev">github</a>
-        <a href="https://youtube.com/@verrendev">youtube</a>
-        <a href="https://x.com/verrendev">x</a>
+        <a href="mailto:hi@verren.dev" title="hi@verren.dev" aria-label="email">
+          <svg class="pixel" data-icon="mail" aria-hidden="true"></svg>
+        </a>
+        <button id="discord" title="verrendev — click to copy" aria-label="copy discord username">
+          <svg class="pixel" data-icon="discord" id="discord-icon" aria-hidden="true"></svg>
+          <svg class="pixel" data-icon="check" id="discord-copied" aria-hidden="true" hidden></svg>
+        </button>
+        <a href="https://github.com/verrendev" title="github" aria-label="github">
+          <svg class="pixel" data-icon="github" aria-hidden="true"></svg>
+        </a>
       </nav>
     </main>
 
     <script>
+      // ===========
+      // Pixel icons
+      // ===========
+
+      const PIXEL_ICONS = {
+        mail: [
+          "###########",
+          "##.......##",
+          "#.##...##.#",
+          "#...#.#...#",
+          "#....#....#",
+          "#.........#",
+          "#.........#",
+          "###########",
+        ],
+        discord: [
+          "..#######..",
+          ".#########.",
+          "###########",
+          "###########",
+          "##..###..##",
+          "##..###..##",
+          "###########",
+          "###########",
+          ".###...###.",
+          ".#.......#.",
+        ],
+        github: [
+          ".#.......#.",
+          ".##.....##.",
+          ".#########.",
+          "###########",
+          "###########",
+          "##..###..##",
+          "###########",
+          "###########",
+          ".#########.",
+          "..#######..",
+        ],
+        check: [
+          "...........",
+          "...........",
+          ".........##",
+          "........##.",
+          ".......##..",
+          "##....##...",
+          ".##..##....",
+          "..####.....",
+          "...##......",
+          "...........",
+        ],
+      };
+
+      const PIXEL_SCALE = 2; // display px per bitmap pixel
+
+      for (const svg of document.querySelectorAll("svg.pixel")) {
+        const rows = PIXEL_ICONS[svg.dataset.icon];
+        const columns = rows[0].length;
+
+        svg.setAttribute("viewBox", `0 0 ${columns} ${rows.length}`);
+        svg.style.width = columns * PIXEL_SCALE + "px";
+        svg.style.height = rows.length * PIXEL_SCALE + "px";
+
+        let d = "";
+        rows.forEach(function (row, y) {
+          for (let x = 0; x < row.length; x++) {
+            if (row[x] === "#") {
+              d += `M${x} ${y}h1v1h-1z`;
+            }
+          }
+        });
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        svg.appendChild(path);
+      }
+
       // =============
       // Barnsley fern
       // =============
@@ -115,19 +238,80 @@
         "(prefers-reduced-motion: reduce)"
       ).matches;
 
+      const accentGreen = getComputedStyle(document.documentElement)
+        .getPropertyValue("--accent-green")
+        .trim();
+
+      // Transformations
+      // ---------------
+
+      // Each transformation maps (x, y) to (a*x + b*y + e, c*x + d*y + f) and is chosen with
+      // probability p. The classic coefficients:
+
+      const BASE_TRANSFORMATIONS = [
+        { p: 0.01, a: 0, b: 0, c: 0, d: 0.16, e: 0, f: 0 },              // stem
+        { p: 0.85, a: 0.85, b: 0.04, c: -0.04, d: 0.85, e: 0, f: 1.6 },  // successively smaller leaflets
+        { p: 0.07, a: 0.2, b: -0.26, c: 0.23, d: 0.22, e: 0, f: 1.6 },   // largest left-hand leaflet
+        { p: 0.07, a: -0.15, b: 0.28, c: 0.26, d: 0.24, e: 0, f: 0.44 }, // largest right-hand leaflet
+      ];
+
+      // Every planted fern gets its own slightly mutated coefficients. The b/c terms control the
+      // curl, so they get the most noise. a/d stay close to base so the fern doesn't collapse or
+      // blow up. The stem is left alone.
+
+      function jitter(value, amount) {
+        return value + (Math.random() * 2 - 1) * amount;
+      }
+
+      function mutateTransformations() {
+        return BASE_TRANSFORMATIONS.map(function (t, index) {
+          if (index === 0) {
+            return t;
+          }
+          return {
+            p: t.p,
+            a: jitter(t.a, 0.015),
+            b: jitter(t.b, 0.03),
+            c: jitter(t.c, 0.03),
+            d: jitter(t.d, 0.015),
+            e: t.e,
+            f: jitter(t.f, 0.06),
+          };
+        });
+      }
+
       // State
       // -----
 
-      let currentX = 0; // roughly [-2.75, 2.75]
-      let currentY = 0; // roughly [0, 10.6]
+      // transformations and bounds are assigned by growFern before anything is drawn.
+
+      let transformations;
+      let bounds; // bounding box of the current fern's attractor
+      let currentX = 0;
+      let currentY = 0;
 
       let activeRunId = 0;
+
+      function step(x, y) {
+        let randomValue = Math.random();
+        let t = transformations[transformations.length - 1];
+
+        for (const candidate of transformations) {
+          if (randomValue < candidate.p) {
+            t = candidate;
+            break;
+          }
+          randomValue -= candidate.p;
+        }
+
+        return [t.a * x + t.b * y + t.e, t.c * x + t.d * y + t.f];
+      }
 
       // Color mapping
       // -------------
 
       // Darker at the bottom and brighter toward the top.
-      
+
       function mossColor(normalizedHeight) {
         const red = Math.floor(40 + 60 * normalizedHeight);
         const green = Math.floor(160 + 80 * normalizedHeight);
@@ -135,71 +319,120 @@
         return `rgb(${red}, ${green}, ${blue})`;
       }
 
-      // Iteration
-      // ---------
-
-      function applyBarnsleyTransformation() {
-        const randomValue = Math.random();
-        let nextX;
-        let nextY;
-
-        if (randomValue < 0.01) { // stem
-          nextX = 0;
-          nextY = 0.16 * currentY;
-        } else if (randomValue < 0.86) { // successively smaller leaflets
-          nextX = 0.85 * currentX + 0.04 * currentY;
-          nextY = -0.04 * currentX + 0.85 * currentY + 1.6;
-        } else if (randomValue < 0.93) { // largest left-hand leaflet
-          nextX = 0.2 * currentX - 0.26 * currentY;
-          nextY = 0.23 * currentX + 0.22 * currentY + 1.6;
-        } else { // largest right-hand leaflet
-          nextX = -0.15 * currentX + 0.28 * currentY;
-          nextY = 0.26 * currentX + 0.24 * currentY + 0.44;
-        }
-
-        currentX = nextX;
-        currentY = nextY;
-      }
-
       // Plotting
       // --------
 
       const CANVAS_MARGIN = 30;
       const POINT_SIZE = 1.4;
-      const FERN_WIDTH = 5.5; // roughly [-2.75, 2.75]
-      const FERN_HEIGHT = 10.6; // roughly [0, 10.6]
       const TOTAL_POINTS = 140000;
+      const SETTLE_POINTS = 20; // iterations before a fresh point lands on the attractor
+
+      // Mutated coefficients grow ferns of slightly different sizes, so each fern's bounding box
+      // is measured from a throwaway sample of its attractor before anything is drawn. The
+      // padding covers extremes the sample may have missed.
+
+      function measureBounds() {
+        let x = 0;
+        let y = 0;
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+
+        for (let i = 0; i < SETTLE_POINTS; i++) {
+          [x, y] = step(x, y);
+        }
+
+        for (let i = 0; i < 5000; i++) {
+          [x, y] = step(x, y);
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+        }
+
+        const padX = (maxX - minX) * 0.04;
+        const padY = (maxY - minY) * 0.04;
+        return { minX: minX - padX, maxX: maxX + padX, minY: minY - padY, maxY: maxY + padY };
+      }
+
+      function heightFraction(y) {
+        return (y - bounds.minY) / (bounds.maxY - bounds.minY);
+      }
+
+      function project(x, y, size, margin) {
+        const drawableSize = size - 2 * margin;
+        const projectedX = ((x - bounds.minX) / (bounds.maxX - bounds.minX)) * drawableSize + margin;
+        const projectedY = size - margin - heightFraction(y) * drawableSize;
+        return [projectedX, projectedY];
+      }
 
       function plotPoints(pointCount) {
-        const drawableSize = CANVAS_SIZE - 2 * CANVAS_MARGIN;
-
         for (let i = 0; i < pointCount; i++) {
-          applyBarnsleyTransformation();
+          [currentX, currentY] = step(currentX, currentY);
 
-          const normalizedHeight = currentY / FERN_HEIGHT;
-          const canvasX = ((currentX + FERN_WIDTH / 2) / FERN_WIDTH) * drawableSize + CANVAS_MARGIN;
-          const canvasY = CANVAS_SIZE - CANVAS_MARGIN - normalizedHeight * drawableSize;
-
-          context.fillStyle = mossColor(normalizedHeight);
+          const [canvasX, canvasY] = project(currentX, currentY, CANVAS_SIZE, CANVAS_MARGIN);
+          context.fillStyle = mossColor(heightFraction(currentY));
           context.fillRect(canvasX, canvasY, POINT_SIZE, POINT_SIZE);
         }
+      }
+
+      // Favicon
+      // -------
+
+      // A tiny fern grown from the same coefficients as the one on screen.
+
+      const faviconLink = document.getElementById("favicon");
+
+      function updateFavicon() {
+        const size = 64;
+        const margin = 4;
+
+        const faviconCanvas = document.createElement("canvas");
+        faviconCanvas.width = size;
+        faviconCanvas.height = size;
+        const faviconContext = faviconCanvas.getContext("2d");
+        faviconContext.fillStyle = accentGreen;
+
+        let x = 0;
+        let y = 0;
+
+        for (let i = 0; i < SETTLE_POINTS; i++) {
+          [x, y] = step(x, y);
+        }
+
+        for (let i = 0; i < 4000; i++) {
+          [x, y] = step(x, y);
+          const [px, py] = project(x, y, size, margin);
+          faviconContext.fillRect(px, py, 1, 1);
+        }
+
+        faviconLink.href = faviconCanvas.toDataURL("image/png");
       }
 
       // Growth animation
       // ----------------
 
+      const TRICKLE_INTERVAL_MS = 250;
+      const TRICKLE_DURATION_MS = 5000;
+
       function growFern() {
         activeRunId += 1;
         const runId = activeRunId;
 
+        transformations = mutateTransformations();
+        bounds = measureBounds();
+        updateFavicon();
+
         context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+        // Let the point settle onto the fern's attractor before anything visible is drawn.
+
         currentX = 0;
         currentY = 0;
-
-        // Discard the first few points so the iteration settles onto the fern's attractor before
-        // anything visible is drawn.
-        
-        plotPoints(20);
+        for (let i = 0; i < SETTLE_POINTS; i++) {
+          [currentX, currentY] = step(currentX, currentY);
+        }
 
         if (prefersReducedMotion) {
           plotPoints(TOTAL_POINTS);
@@ -220,12 +453,15 @@
           if (pointsDrawn < TOTAL_POINTS) {
             requestAnimationFrame(drawNextFrame);
           } else {
-            // Fully grown: keep adding a trickle of points so the fern continues to densify.
-            setInterval(function () {
-              if (runId === activeRunId) {
-                plotPoints(30);
+            // Fully grown: keep densifying with a trickle of points for a few seconds
+            let trickleTicksLeft = TRICKLE_DURATION_MS / TRICKLE_INTERVAL_MS;
+            const trickle = setInterval(function () {
+              if (runId !== activeRunId || trickleTicksLeft-- <= 0) {
+                clearInterval(trickle);
+                return;
               }
-            }, 250);
+              plotPoints(30);
+            }, TRICKLE_INTERVAL_MS);
           }
         }
 
@@ -234,6 +470,33 @@
 
       canvas.addEventListener("click", growFern);
       growFern();
+
+      // Discord copy button
+      // ===================
+
+      const DISCORD_HANDLE = "verrendev";
+
+      const discordButton = document.getElementById("discord");
+      const discordIcon = document.getElementById("discord-icon");
+      const discordCopiedIcon = document.getElementById("discord-copied");
+      let discordResetTimeout;
+
+      discordButton.addEventListener("click", function () {
+        navigator.clipboard
+          .writeText(DISCORD_HANDLE)
+          .then(function () {
+            discordIcon.hidden = true;
+            discordCopiedIcon.hidden = false;
+            clearTimeout(discordResetTimeout);
+            discordResetTimeout = setTimeout(function () {
+              discordIcon.hidden = false;
+              discordCopiedIcon.hidden = true;
+            }, 1400);
+          })
+          .catch(function () {
+            console.warn("Clipboard unavailable");
+          });
+      });
     </script>
   </body>
 </html>
